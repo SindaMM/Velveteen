@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Velveteen · Book services · Token system</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; }
+    body { background: #faf7f5; color: #2e241e; padding: 1rem; min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; }
+    .app { max-width: 1400px; width: 100%; background: #fffcf9; border-radius: 2.5rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); padding: 1.8rem 2rem; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+    .brand h1 { font-size: 1.8rem; font-weight: 600; letter-spacing: -0.02em; background: linear-gradient(135deg,#6b4e3a,#b48b6e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .brand p { font-size: 0.9rem; color: #7a6a5e; }
+    .view-switch { display: flex; gap: 0.5rem; background: #f3ede8; padding: 0.3rem; border-radius: 100px; }
+    .view-switch button { border: none; padding: 0.6rem 1.5rem; border-radius: 100px; font-weight: 500; font-size: 0.9rem; background: transparent; cursor: pointer; color: #6b5a4e; transition: all 0.2s; }
+    .view-switch button.active { background: white; color: #2e241e; box-shadow: 0 4px 8px rgba(0,0,0,0.04); }
+    .token-badge { background: #ede5df; border-radius: 100px; padding: 0.5rem 1rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+    .token-badge i { color: #b48b6e; }
+    .token-badge.low { background: #fef0e0; color: #b85c00; }
+    .token-badge.critical { background: #fce4e4; color: #b33a3a; }
+    .container { display: none; }
+    .container.active { display: block; }
+    .step-indicator { display: flex; justify-content: space-between; margin-bottom: 2rem; padding: 0 1rem; }
+    .step { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; }
+    .step:not(:last-child)::after { content: ''; position: absolute; top: 1rem; left: 60%; width: 80%; height: 2px; background: #e4dbd3; z-index: 1; }
+    .step.active:not(:last-child)::after { background: #b48b6e; }
+    .step-circle { width: 2.2rem; height: 2.2rem; border-radius: 50%; background: #e4dbd3; color: #6b5a4e; display: flex; align-items: center; justify-content: center; font-weight: 600; position: relative; z-index: 2; margin-bottom: 0.5rem; }
+    .step.active .step-circle { background: #b48b6e; color: white; }
+    .step span { font-size: 0.8rem; color: #7a6a5e; font-weight: 500; }
+    .step.active span { color: #2e241e; }
+    .services-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.2rem; margin: 1.5rem 0; }
+    .service-card { background: white; border-radius: 1.5rem; padding: 1.4rem; box-shadow: 0 8px 16px -8px rgba(0,0,0,0.08); border: 1px solid #f0e8e2; cursor: pointer; transition: all 0.15s; }
+    .service-card.selected { border: 2px solid #b48b6e; background: #fffbf8; box-shadow: 0 12px 24px -12px rgba(180,139,110,0.3); }
+    .service-card .category-badge { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #b48b6e; font-weight: 600; margin-bottom: 0.5rem; }
+    .service-card h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .service-card .desc { font-size: 0.8rem; color: #7a6a5e; margin-bottom: 0.8rem; line-height: 1.4; }
+    .service-meta { display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 500; }
+    .price { color: #6b4e3a; }
+    .duration { color: #7a6a5e; }
+    .date-time-container { display: flex; gap: 2rem; flex-wrap: wrap; margin: 1.5rem 0; }
+    .calendar-section { flex: 1.5; min-width: 280px; }
+    .time-section { flex: 1; min-width: 220px; }
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; font-weight: 600; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.3rem; }
+    .calendar-day-label { text-align: center; font-size: 0.7rem; color: #9b8a7c; padding: 0.4rem 0; }
+    .calendar-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 100px; font-size: 0.85rem; cursor: pointer; transition: 0.1s; color: #2e241e; }
+    .calendar-day:hover:not(.disabled) { background: #f3ede8; }
+    .calendar-day.selected { background: #b48b6e; color: white; font-weight: 600; }
+    .calendar-day.disabled { color: #cbbdb2; text-decoration: line-through; cursor: not-allowed; }
+    .time-slots { display: flex; flex-direction: column; gap: 0.5rem; max-height: 280px; overflow-y: auto; padding-right: 0.5rem; }
+    .time-slot { padding: 0.7rem; text-align: center; border-radius: 2rem; background: #f3ede8; font-size: 0.9rem; font-weight: 500; cursor: pointer; border: 1px solid transparent; }
+    .time-slot.selected { background: #b48b6e; color: white; }
+    .time-slot.booked, .time-slot.blocked { background: #eae2dc; color: #b1a093; text-decoration: line-through; cursor: not-allowed; }
+    .details-form { margin: 1.5rem 0; display: flex; flex-direction: column; gap: 1rem; }
+    .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .form-group { flex: 1; min-width: 180px; }
+    .form-group label { font-size: 0.8rem; font-weight: 500; color: #6b5a4e; display: block; margin-bottom: 0.2rem; }
+    .form-group input, .form-group select { width: 100%; padding: 0.8rem 1rem; border: 1px solid #e4dbd3; border-radius: 2rem; background: white; font-size: 0.9rem; }
+    .reminder-row { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; padding: 0.5rem 0; border-bottom: 1px dashed #e4dbd3; }
+    .reminder-row select, .reminder-row input { padding: 0.5rem 1rem; border-radius: 2rem; border: 1px solid #e4dbd3; background: white; }
+    .btn { border: none; padding: 0.9rem 2rem; border-radius: 100px; font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
+    .btn-primary { background: #6b4e3a; color: white; }
+    .btn-primary:hover:not(:disabled) { background: #543d2e; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-outline { background: transparent; border: 1px solid #d9cec6; color: #4f3f35; }
+    .btn-sm { padding: 0.4rem 1rem; font-size: 0.8rem; }
+    .btn-danger { background: #c45a5a; color: white; }
+    .nav-buttons { display: flex; justify-content: space-between; margin-top: 2rem; }
+    .confirmation-box { background: #f9f4f0; border-radius: 2rem; padding: 2rem; text-align: center; margin: 1.5rem 0; }
+    .confirmation-box i { font-size: 3rem; color: #6b9e6b; margin-bottom: 1rem; }
+    .share-link { display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: white; padding: 0.8rem 1.2rem; border-radius: 100px; border: 1px solid #e4dbd3; margin: 1.5rem auto; max-width: 500px; font-size: 0.9rem; flex-wrap: wrap; }
+    .copy-btn { background: #6b4e3a; color: white; border: none; border-radius: 100px; padding: 0.4rem 1rem; cursor: pointer; }
+    .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card { background: white; border-radius: 1.5rem; padding: 1.5rem; box-shadow: 0 8px 16px -8px rgba(0,0,0,0.05); }
+    .stat-card h4 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: #9b8a7c; margin-bottom: 0.4rem; }
+    .stat-card .value { font-size: 1.8rem; font-weight: 600; color: #2e241e; }
+    .admin-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid #e4dbd3; padding-bottom: 0.5rem; flex-wrap: wrap; }
+    .admin-tabs button { background: transparent; border: none; padding: 0.6rem 1.2rem; border-radius: 100px; font-weight: 500; color: #7a6a5e; cursor: pointer; }
+    .admin-tabs button.active { background: #ede5df; color: #2e241e; }
+    .admin-panel { display: none; }
+    .admin-panel.active { display: block; }
+    .table-wrapper { overflow-x: auto; background: white; border-radius: 1.5rem; padding: 1rem; box-shadow: 0 8px 16px -8px rgba(0,0,0,0.05); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { text-align: left; padding: 0.8rem; color: #9b8a7c; font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    td { padding: 0.8rem; border-top: 1px solid #f0e8e2; }
+    .status-badge { display: inline-block; padding: 0.2rem 0.8rem; border-radius: 100px; font-size: 0.7rem; font-weight: 600; text-transform: capitalize; }
+    .status-confirmed { background: #e3f0e3; color: #3e6b3e; }
+    .status-pending { background: #fef3d9; color: #8a6e2b; }
+    .status-completed { background: #e0e7f0; color: #3e5a7a; }
+    .status-cancelled { background: #f3e0e0; color: #9b4b4b; }
+    .service-item, .slot-item { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem; border-bottom: 1px solid #f0e8e2; }
+    .inline-form { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: flex-end; background: white; padding: 1.5rem; border-radius: 1.5rem; margin-bottom: 1.5rem; }
+    .inline-form .form-group { min-width: 120px; }
+    .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.5rem; margin: 1rem 0; }
+    .slot-block { padding: 0.6rem; text-align: center; border-radius: 100px; background: #f3ede8; font-size: 0.8rem; cursor: pointer; user-select: none; }
+    .slot-block.blocked { background: #f3d9d9; color: #9b4b4b; text-decoration: line-through; }
+    .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: #2e241e; color: white; padding: 0.8rem 1.8rem; border-radius: 100px; font-size: 0.9rem; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 999; max-width: 90vw; text-align: center; }
+    .toast.show { opacity: 1; }
+    .hidden { display: none !important; }
+    .token-panel { background: #f9f4f0; border-radius: 1.5rem; padding: 1.5rem; margin-bottom: 2rem; }
+    .token-bar { height: 12px; background: #e4dbd3; border-radius: 100px; overflow: hidden; margin: 0.5rem 0 1rem; }
+    .token-bar-fill { height: 100%; background: #b48b6e; border-radius: 100px; transition: width 0.3s; }
+    .token-bar-fill.low { background: #e6a23c; }
+    .token-bar-fill.critical { background: #c45a5a; }
+    .topup-options { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.8rem; }
+    .topup-options button { background: white; border: 1px solid #d9cec6; border-radius: 100px; padding: 0.5rem 1.2rem; font-size: 0.85rem; cursor: pointer; font-weight: 500; }
+    .topup-options button:hover { background: #f3ede8; }
+    .referral-box { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; background: white; border-radius: 1.5rem; padding: 1rem 1.5rem; margin-bottom: 1.5rem; border: 1px dashed #d9cec6; }
+    .login-box { background: white; border-radius: 1.5rem; padding: 2rem; max-width: 420px; margin: 2rem auto; box-shadow: 0 8px 16px -8px rgba(0,0,0,0.08); }
+    .login-box h2 { font-size: 1.4rem; margin-bottom: 0.5rem; }
+    .login-box p { font-size: 0.85rem; color: #7a6a5e; margin-bottom: 1.2rem; }
+    @media (max-width: 700px) { .app { padding: 1rem; } .header { flex-direction: column; align-items: flex-start; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="brand">
+      <h1 id="brandName">Velveteen Studio</h1>
+      <p id="brandTagline">Book trusted personal service providers</p>
+    </div>
+    <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+      <div id="headerTokenBadge" class="token-badge">
+        <i class="fas fa-coins"></i> <span id="headerTokenCount">5</span> tokens
+      </div>
+      <div class="view-switch">
+        <button id="customerViewBtn" class="active">Customer booking</button>
+        <button id="adminViewBtn">Provider panel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= CUSTOMER FLOW ================= -->
+  <div id="customerView" class="container active">
+    <div class="step-indicator">
+      <div class="step active" id="step1Indicator"><div class="step-circle">1</div><span>Service</span></div>
+      <div class="step" id="step2Indicator"><div class="step-circle">2</div><span>Date & time</span></div>
+      <div class="step" id="step3Indicator"><div class="step-circle">3</div><span>Details</span></div>
+    </div>
+
+    <div id="step1Content">
+      <h2 style="font-size:1.4rem; margin-bottom:0.5rem;">Choose a service</h2>
+      <p style="color:#7a6a5e; margin-bottom:1rem;">Free for customers — no booking fees.</p>
+      <div id="servicesContainer" class="services-grid"></div>
+      <div class="nav-buttons"><div></div><button id="toStep2Btn" class="btn btn-primary" disabled>Continue to date & time</button></div>
+    </div>
+
+    <div id="step2Content" class="hidden">
+      <h2 style="font-size:1.4rem; margin-bottom:0.5rem;">Pick a date & time</h2>
+      <div class="date-time-container">
+        <div class="calendar-section">
+          <div class="calendar-header">
+            <button id="prevMonth" class="btn btn-sm btn-outline"><i class="fas fa-chevron-left"></i></button>
+            <span id="monthYearDisplay">June 2025</span>
+            <button id="nextMonth" class="btn btn-sm btn-outline"><i class="fas fa-chevron-right"></i></button>
+          </div>
+          <div class="calendar-grid" id="calendarGrid"></div>
+        </div>
+        <div class="time-section">
+          <h3 style="font-size:1rem; margin-bottom:0.8rem;">Available times</h3>
+          <div id="timeSlotsContainer" class="time-slots"><p style="color:#9b8a7c; font-size:0.9rem;">Select a date first</p></div>
+        </div>
+      </div>
+      <div class="nav-buttons">
+        <button id="backToStep1Btn" class="btn btn-outline">Back</button>
+        <button id="toStep3Btn" class="btn btn-primary" disabled>Continue to details</button>
+      </div>
+    </div>
+
+    <div id="step3Content" class="hidden">
+      <h2 style="font-size:1.4rem; margin-bottom:0.5rem;">Your details</h2>
+      <div class="details-form">
+        <div class="form-row">
+          <div class="form-group"><label>Full name</label><input type="text" id="customerName" placeholder="e.g. Jane Mwangi"></div>
+          <div class="form-group"><label>Phone number</label><input type="tel" id="customerPhone" placeholder="+254 700 000000"></div>
+        </div>
+        <div class="form-group"><label>Email address</label><input type="email" id="customerEmail" placeholder="jane@example.com"></div>
+        <div>
+          <label style="font-weight:500; font-size:0.9rem;">Reminders (up to 3)</label>
+          <div id="remindersContainer"></div>
+          <button id="addReminderBtn" class="btn btn-outline btn-sm" style="margin-top:0.5rem;"><i class="fas fa-plus"></i> Add reminder</button>
+        </div>
+        <p style="font-size:0.8rem; color:#6b5a4e; margin-top:0.5rem;"><i class="fas fa-clock"></i> Free cancellation up to <span id="cancelWindowDisplay">24</span> hours before your appointment.</p>
+        <p style="font-size:0.8rem; color:#6b5a4e;"><i class="fas fa-info-circle"></i> Your booking uses 1 token from the provider's balance (KES 50). No cost to you.</p>
+      </div>
+      <div class="nav-buttons">
+        <button id="backToStep2Btn" class="btn btn-outline">Back</button>
+        <button id="confirmBookingBtn" class="btn btn-primary" disabled>Confirm booking</button>
+      </div>
+    </div>
+
+    <div id="confirmationContent" class="hidden">
+      <div class="confirmation-box">
+        <i class="fas fa-check-circle"></i>
+        <h2 style="font-size:1.6rem; margin-bottom:0.5rem;">Booking confirmed!</h2>
+        <p id="confirmationMessage" style="color:#6b5a4e;">Your appointment is booked.</p>
+        <div class="share-link">
+          <i class="fas fa-link"></i>
+          <span id="shareableLink">https://velveteen.studio/booking/abc123</span>
+          <button id="copyLinkBtn" class="copy-btn">Copy</button>
+        </div>
+        <button id="newBookingBtn" class="btn btn-outline" style="margin-top:1rem;">Make another booking</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ADMIN / PROVIDER PANEL ================= -->
+  <div id="adminView" class="container">
+    <div id="loginView" class="login-box">
+      <h2>Provider login</h2>
+      <p>Sign in to manage your services, bookings, and tokens.</p>
+      <div class="details-form" style="margin-top:0;">
+        <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="you@example.com" value="demo@velveteen.studio"></div>
+        <div class="form-group"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" value="demo1234"></div>
+        <button id="loginBtn" class="btn btn-primary">Sign in</button>
+        <button id="signupBtn" class="btn btn-outline">Create account (demo)</button>
+        <p style="font-size:0.75rem; color:#9b8a7c; margin-top:0.5rem;">Demo: use the prefilled credentials, or click Create account.</p>
+      </div>
+    </div>
+
+    <div id="adminContent" class="hidden">
+      <div class="token-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+          <div>
+            <h3 style="font-size:1.1rem;">Your token balance</h3>
+            <p style="font-size:0.8rem; color:#7a6a5e;">Each booking uses 1 token (KES 50). Free trial: 5 tokens.</p>
+          </div>
+          <div id="tokenStatusBadge" class="token-badge"><i class="fas fa-coins"></i> <span id="adminTokenCount">5</span> tokens left</div>
+        </div>
+        <div class="token-bar"><div id="tokenBarFill" class="token-bar-fill" style="width:100%;"></div></div>
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; align-items:center;">
+          <span id="tokenAlertMsg" style="font-size:0.85rem; color:#6b5a4e;">You have 5 free tokens to start.</span>
+          <div class="topup-options">
+            <button data-topup="500">Top up KES 500 (10 tokens)</button>
+            <button data-topup="1000">Top up KES 1,000 (20 tokens)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="referral-box">
+        <i class="fas fa-gift" style="color:#b48b6e; font-size:1.3rem;"></i>
+        <div style="flex:1;">
+          <strong style="font-size:0.95rem;">Refer another provider, earn 3 tokens</strong>
+          <p style="font-size:0.8rem; color:#7a6a5e;">Share your referral code — when they sign up, you get 3 free tokens.</p>
+        </div>
+        <code id="referralCode" style="background:#f3ede8; padding:0.4rem 0.9rem; border-radius:100px; font-weight:600;">VELVET-REF-001</code>
+        <button id="copyReferralBtn" class="btn btn-outline btn-sm">Copy code</button>
+        <button id="simulateReferralBtn" class="btn btn-primary btn-sm">Simulate referral signup</button>
+      </div>
+
+      <div class="admin-stats">
+        <div class="stat-card"><h4>Today's bookings</h4><div class="value" id="statToday">0</div></div>
+        <div class="stat-card"><h4>Upcoming</h4><div class="value" id="statUpcoming">0</div></div>
+        <div class="stat-card"><h4>Total revenue</h4><div class="value" id="statRevenue">KES 0</div></div>
+        <div class="stat-card"><h4>Active services</h4><div class="value" id="statServices">0</div></div>
+      </div>
+
+      <div class="admin-tabs">
+        <button data-tab="bookings" class="active">Bookings</button>
+        <button data-tab="services">Services</button>
+        <button data-tab="availability">Availability</button>
+        <button data-tab="settings">Settings</button>
+      </div>
+
+      <div id="adminBookingsPanel" class="admin-panel active">
+        <div class="inline-form" style="gap:0.8rem;">
+          <div class="form-group" style="flex:2;"><label>Search</label><input type="text" id="bookingSearch" placeholder="Customer or service..."></div>
+          <div class="form-group"><label>Status</label>
+            <select id="bookingStatusFilter">
+              <option value="all">All</option>
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Customer</th><th>Service</th><th>Date & time</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="bookingsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="adminServicesPanel" class="admin-panel">
+        <div class="inline-form">
+          <div class="form-group"><label>Name</label><input id="newServiceName" placeholder="Service name"></div>
+          <div class="form-group"><label>Category</label><input id="newServiceCategory" placeholder="e.g. Hair"></div>
+          <div class="form-group"><label>Price</label><input id="newServicePrice" type="number" placeholder="1500"></div>
+          <div class="form-group"><label>Duration (min)</label><input id="newServiceDuration" type="number" placeholder="60"></div>
+          <div class="form-group" style="flex:2;"><label>Description</label><input id="newServiceDesc" placeholder="Short description"></div>
+          <button id="addServiceBtn" class="btn btn-primary btn-sm">Add service</button>
+        </div>
+        <div id="servicesList" class="table-wrapper"></div>
+      </div>
+
+      <div id="adminAvailabilityPanel" class="admin-panel">
+        <div class="inline-form">
+          <div class="form-group"><label>Date</label><input type="date" id="availabilityDate"></div>
+          <div class="form-group"><label>From</label><input type="time" id="blockFrom" value="12:00"></div>
+          <div class="form-group"><label>To</label><input type="time" id="blockTo" value="13:00"></div>
+          <button id="blockRangeBtn" class="btn btn-primary btn-sm">Block range</button>
+        </div>
+        <h3 style="margin:1rem 0 0.5rem;">Time slots for selected date</h3>
+        <div id="slotGridContainer" class="slot-grid"></div>
+        <p style="font-size:0.8rem; color:#7a6a5e; margin-top:0.5rem;">Click a slot to toggle block. Blocked slots are invisible to customers.</p>
+      </div>
+
+      <div id="adminSettingsPanel" class="admin-panel">
+        <div class="inline-form" style="flex-direction:column; align-items:stretch;">
+          <div class="form-row">
+            <div class="form-group"><label>Business name</label><input id="settingsName" value="Velveteen Studio"></div>
+            <div class="form-group"><label>Tagline</label><input id="settingsTagline" value="Book trusted personal service providers"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Phone</label><input id="settingsPhone" value="+254 700 123456"></div>
+            <div class="form-group"><label>Email</label><input id="settingsEmail" value="hello@velveteen.studio"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Working days</label><input id="settingsWorkingDays" value="Mon-Sat"></div>
+            <div class="form-group"><label>Opening hours</label><input id="settingsHours" value="9:00 - 19:00"></div>
+            <div class="form-group"><label>Slot interval (min)</label><input id="settingsSlotInterval" type="number" value="30"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Cancellation window (hours)</label><input id="settingsCancelWindow" type="number" value="24"></div>
+            <div class="form-group"><label>Currency</label>
+              <select id="settingsCurrency">
+                <option>KES</option><option>USD</option><option>NGN</option><option>ZAR</option><option>GBP</option>
+              </select>
+            </div>
+          </div>
+          <button id="saveSettingsBtn" class="btn btn-primary btn-sm" style="align-self:flex-start; margin-top:1rem;">Save settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  (function(){
+    // ============================================================
+    // ⚠️ REPLACE THESE WITH YOUR SUPABASE PROJECT CREDENTIALS
+    // ============================================================
+    const SUPABASE_URL = 'YOUR_PROJECT_URL';       // e.g. https://abcxyz.supabase.co
+    const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';     // e.g. eyJhbGciOi...
+
+    // If credentials are not set, fall back to in-memory demo mode
+    const USE_SUPABASE = !SUPABASE_URL.includes('YOUR_PROJECT_URL');
+    let supabase = null;
+    if (USE_SUPABASE) {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+
+    // ---------- FALLBACK IN-MEMORY DATA ----------
+    let services = [
+      { id: 's1', name: 'Silk Press', category: 'Hair', description: 'Smooth, shiny hair with heat protection', price: 2500, duration: 90, active: true },
+      { id: 's2', name: 'Gel Manicure', category: 'Nails', description: 'Long-lasting gel polish with nail art', price: 1500, duration: 60, active: true },
+      { id: 's3', name: 'Bridal Makeup', category: 'Makeup', description: 'Full glam for your special day', price: 5500, duration: 120, active: true },
+      { id: 's4', name: 'Deep Tissue Massage', category: 'Massage', description: 'Relieve tension and stress', price: 3000, duration: 60, active: true },
+      { id: 's5', name: 'Classic Facial', category: 'Skin', description: 'Cleanse, exfoliate, hydrate', price: 2000, duration: 75, active: true },
+      { id: 's6', name: 'Volume Lashes', category: 'Lashes', description: 'Full volume lash extensions', price: 3500, duration: 120, active: true },
+    ];
+    let bookings = [
+      { id: 'b1', customerName: 'Alice W.', customerPhone: '+254700111222', customerEmail: 'alice@example.com', serviceId: 's1', serviceName: 'Silk Press', date: '2025-06-10', time: '10:00', status: 'confirmed', price: 2500, reminders: [] },
+      { id: 'b2', customerName: 'Brenda K.', customerPhone: '+254700333444', customerEmail: 'brenda@example.com', serviceId: 's2', serviceName: 'Gel Manicure', date: '2025-06-10', time: '14:00', status: 'pending', price: 1500, reminders: [] },
+    ];
+    let blockedSlots = { '2025-06-11': ['12:00','12:30'], '2025-06-15': ['09:00','09:30','10:00'] };
+
+    // ---- TOKEN / BILLING ----
+    let tokenBalance = 5;
+    const TOKEN_COST_KES = 50;
+    const MIN_TOPUP_KES = 500;
+    const TOPUP_TOKENS_PER_500 = 10;
+    const REFERRAL_BONUS_TOKENS = 3;
+    let lowBalanceThreshold = 2;
+    let referralCount = 0;
+
+    let settings = {
+      businessName: 'Velveteen Studio', tagline: 'Book trusted personal service providers',
+      phone: '+254 700 123456', email: 'hello@velveteen.studio',
+      workingDays: 'Mon-Sat', hours: '9:00 - 19:00',
+      slotInterval: 30, cancelWindow: 24, currency: 'KES',
+    };
+
+    // ---------- STATE ----------
+    let currentStep = 1;
+    let selectedServiceId = null;
+    let selectedDate = null;
+    let selectedTime = null;
+    let currentMonth = new Date(2025, 5, 1);
+    let reminders = [{ lead: '30min', method: 'SMS' }];
+    let adminActiveTab = 'bookings';
+    let isLoggedIn = false;
+
+    // ---------- UTILS ----------
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2800);
+    }
+    function formatCurrency(amount) {
+      return settings.currency + ' ' + Number(amount).toLocaleString();
+    }
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr + 'T00:00:00');
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    function formatTime(timeStr) {
+      if (!timeStr) return '';
+      const [h, m] = timeStr.split(':');
+      const hour = parseInt(h);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${m} ${ampm}`;
+    }
+    function todayStr() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    // ---------- SUPABASE HELPERS ----------
+    async function loadDataFromSupabase() {
+      if (!USE_SUPABASE) return;
+      try {
+        // Load services
+        const { data: servicesData, error: sErr } = await supabase.from('services').select('*').order('created_at', { ascending: true });
+        if (!sErr) {
+          services = servicesData.map(s => ({
+            id: s.id, name: s.name, category: s.category, description: s.description,
+            price: s.price, duration: s.duration, active: s.active,
+          }));
+        }
+        // Load bookings
+        const { data: bookingsData, error: bErr } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
+        if (!bErr) {
+          bookings = bookingsData.map(b => ({
+            id: b.id, customerName: b.customer_name, customerPhone: b.customer_phone,
+            customerEmail: b.customer_email, serviceId: b.service_id, serviceName: b.service_name,
+            date: b.booking_date, time: b.booking_time, status: b.status,
+            price: b.price, reminders: b.reminders || [],
+          }));
+        }
+        // Load settings & tokens
+        const { data: setData, error: setErr } = await supabase.from('provider_settings').select('*').eq('id', 1).single();
+        if (!setErr && setData) {
+          tokenBalance = setData.token_balance ?? 5;
+          lowBalanceThreshold = setData.low_balance_threshold ?? 2;
+          if (setData.business_name) {
+            settings.businessName = setData.business_name;
+            document.getElementById('brandName').textContent = setData.business_name;
+          }
+          if (setData.currency) settings.currency = setData.currency;
+        }
+        // Load blocked slots (if you have a table; otherwise keep in-memory)
+        // For demo, we keep blockedSlots in-memory.
+      } catch (e) {
+        console.error('Supabase load error:', e);
+        showToast('Could not load data from Supabase. Using demo data.');
+      }
+    }
+
+    async function persistTokenBalance(newBalance) {
+      if (!USE_SUPABASE) { tokenBalance = newBalance; return true; }
+      const { error } = await supabase.from('provider_settings').update({ token_balance: newBalance }).eq('id', 1);
+      if (error) { console.error(error); showToast('Token update failed: ' + error.message); return false; }
+      tokenBalance = newBalance;
+      return true;
+    }
+
+    // ---------- TOKEN UI ----------
+    function updateTokenUI() {
+      document.getElementById('headerTokenCount').textContent = tokenBalance;
+      document.getElementById('adminTokenCount').textContent = tokenBalance;
+      const badge = document.getElementById('headerTokenBadge');
+      badge.classList.remove('low','critical');
+      if (tokenBalance <= 0) badge.classList.add('critical');
+      else if (tokenBalance <= lowBalanceThreshold) badge.classList.add('low');
+      const statusBadge = document.getElementById('tokenStatusBadge');
+      statusBadge.classList.remove('low','critical');
+      if (tokenBalance <= 0) statusBadge.classList.add('critical');
+      else if (tokenBalance <= lowBalanceThreshold) statusBadge.classList.add('low');
+      const pct = Math.min(100, (tokenBalance / 20) * 100);
+      const fill = document.getElementById('tokenBarFill');
+      fill.style.width = pct + '%';
+      fill.classList.remove('low','critical');
+      if (tokenBalance <= 0) fill.classList.add('critical');
+      else if (tokenBalance <= lowBalanceThreshold) fill.classList.add('low');
+      const alertMsg = document.getElementById('tokenAlertMsg');
+      if (tokenBalance <= 0) {
+        alertMsg.textContent = 'No tokens left. Top up to keep accepting bookings.';
+        alertMsg.style.color = '#b33a3a';
+      } else if (tokenBalance <= lowBalanceThreshold) {
+        alertMsg.textContent = `Low balance alert: only ${tokenBalance} token(s) left. Top up soon.`;
+        alertMsg.style.color = '#b85c00';
+      } else {
+        alertMsg.textContent = `You have ${tokenBalance} token(s) — enough for ${tokenBalance} booking(s).`;
+        alertMsg.style.color = '#6b5a4e';
+      }
+    }
+
+    async function consumeToken() {
+      if (tokenBalance <= 0) { showToast('Provider has no tokens left. Booking cannot be confirmed.'); return false; }
+      const ok = await persistTokenBalance(tokenBalance - 1);
+      if (!ok) return false;
+      updateTokenUI();
+      if (tokenBalance === 0) showToast('Provider token balance depleted. Top up to continue.');
+      else if (tokenBalance <= lowBalanceThreshold) showToast(`Low balance: ${tokenBalance} token(s) left.`);
+      return true;
+    }
+
+    async function topUpTokens(kes) {
+      if (kes < MIN_TOPUP_KES) { showToast(`Minimum top-up is ${formatCurrency(MIN_TOPUP_KES)}.`); return; }
+      const tokens = Math.floor(kes / TOKEN_COST_KES);
+      const newBalance = tokenBalance + tokens;
+      const ok = await persistTokenBalance(newBalance);
+      if (!ok) return;
+      updateTokenUI();
+      showToast(`Top-up successful! +${tokens} tokens (${formatCurrency(kes)}).`);
+    }
+
+    async function applyReferralBonus() {
+      const newBalance = tokenBalance + REFERRAL_BONUS_TOKENS;
+      const ok = await persistTokenBalance(newBalance);
+      if (!ok) return;
+      referralCount += 1;
+      updateTokenUI();
+      showToast(`Referral bonus: +${REFERRAL_BONUS_TOKENS} tokens! New balance: ${tokenBalance}.`);
+    }
+
+    // ---------- CUSTOMER: SERVICES ----------
+    function renderServices() {
+      const container = document.getElementById('servicesContainer');
+      const active = services.filter(s => s.active);
+      container.innerHTML = '';
+      active.forEach(s => {
+        const card = document.createElement('div');
+        card.className = 'service-card' + (selectedServiceId === s.id ? ' selected' : '');
+        card.innerHTML = `
+          <div class="category-badge">${s.category}</div>
+          <h3>${s.name}</h3>
+          <p class="desc">${s.description || ''}</p>
+          <div class="service-meta">
+            <span class="price">${formatCurrency(s.price)}</span>
+            <span class="duration">${s.duration} min</span>
+          </div>`;
+        card.addEventListener('click', () => {
+          selectedServiceId = s.id;
+          renderServices();
+          document.getElementById('toStep2Btn').disabled = false;
+        });
+        container.appendChild(card);
+      });
+      if (active.length === 0) container.innerHTML = '<p style="color:#9b8a7c;">No active services. Provider can add services in the panel.</p>';
+    }
+
+    // ---------- CALENDAR ----------
+    function renderCalendar() {
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
+      const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      document.getElementById('monthYearDisplay').textContent = `${monthNames[month]} ${year}`;
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const grid = document.getElementById('calendarGrid');
+      grid.innerHTML = '';
+      ['S','M','T','W','T','F','S'].forEach(l => {
+        const el = document.createElement('div'); el.className = 'calendar-day-label'; el.textContent = l; grid.appendChild(el);
+      });
+      for (let i = 0; i < firstDay; i++) grid.appendChild(document.createElement('div'));
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const el = document.createElement('div');
+        el.className = 'calendar-day';
+        el.textContent = d;
+        const past = dateStr < todayStr();
+        const sunday = new Date(dateStr + 'T00:00:00').getDay() === 0;
+        if (past || sunday) {
+          el.classList.add('disabled');
+        } else {
+          if (selectedDate === dateStr) el.classList.add('selected');
+          el.addEventListener('click', () => {
+            selectedDate = dateStr; selectedTime = null;
+            renderCalendar(); renderTimeSlots();
+            document.getElementById('toStep3Btn').disabled = true;
+          });
+        }
+        grid.appendChild(el);
+      }
+    }
+
+    // ---------- TIME SLOTS ----------
+    function generateTimeSlots() {
+      const slots = [];
+      const startHour = 9, endHour = 19, interval = settings.slotInterval;
+      for (let h = startHour; h < endHour; h++) {
+        for (let m = 0; m < 60; m += interval) {
+          slots.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+        }
+      }
+      return slots;
+    }
+
+    function renderTimeSlots() {
+      const container = document.getElementById('timeSlotsContainer');
+      if (!selectedDate) { container.innerHTML = '<p style="color:#9b8a7c; font-size:0.9rem;">Select a date first</p>'; return; }
+      const slots = generateTimeSlots();
+      const blocked = blockedSlots[selectedDate] || [];
+      const booked = bookings.filter(b => b.date === selectedDate && b.status !== 'cancelled').map(b => b.time);
+      container.innerHTML = '';
+      slots.forEach(t => {
+        const el = document.createElement('div');
+        el.className = 'time-slot';
+        el.textContent = formatTime(t);
+        const isBlocked = blocked.includes(t);
+        const isBooked = booked.includes(t);
+        if (isBlocked || isBooked) {
+          el.classList.add(isBlocked ? 'blocked' : 'booked');
+        } else {
+          if (selectedTime === t) el.classList.add('selected');
+          el.addEventListener('click', () => {
+            selectedTime = t; renderTimeSlots();
+            document.getElementById('toStep3Btn').disabled = false;
+          });
+        }
+        container.appendChild(el);
+      });
+    }
+
+    // ---------- REMINDERS ----------
+    function renderReminders() {
+      const container = document.getElementById('remindersContainer');
+      container.innerHTML = '';
+      reminders.forEach((r, idx) => {
+        const row = document.createElement('div');
+        row.className = 'reminder-row';
+        row.innerHTML = `
+          <select data-idx="${idx}" class="reminder-lead">
+            <option value="30min" ${r.lead==='30min'?'selected':''}>30 min before</option>
+            <option value="1h" ${r.lead==='1h'?'selected':''}>1 hour before</option>
+            <option value="3h" ${r.lead==='3h'?'selected':''}>3 hours before</option>
+            <option value="1d" ${r.lead==='1d'?'selected':''}>1 day before</option>
+            <option value="1w" ${r.lead==='1w'?'selected':''}>1 week before</option>
+          </select>
+          <select data-idx="${idx}" class="reminder-method">
+            <option value="SMS" ${r.method==='SMS'?'selected':''}>SMS</option>
+            <option value="Email" ${r.method==='Email'?'selected':''}>Email</option>
+            <option value="Both" ${r.method==='Both'?'selected':''}>Both</option>
+          </select>
+          <button class="btn btn-sm btn-outline remove-reminder" data-idx="${idx}">✕</button>`;
+        container.appendChild(row);
+      });
+      container.querySelectorAll('.reminder-lead').forEach(sel => sel.addEventListener('change', e => { reminders[+e.target.dataset.idx].lead = e.target.value; }));
+      container.querySelectorAll('.reminder-method').forEach(sel => sel.addEventListener('change', e => { reminders[+e.target.dataset.idx].method = e.target.value; }));
+      container.querySelectorAll('.remove-reminder').forEach(btn => btn.addEventListener('click', e => { reminders.splice(+e.target.dataset.idx, 1); renderReminders(); }));
+      document.getElementById('addReminderBtn').disabled = reminders.length >= 3;
+    }
+
+    // ---------- CONFIRM BOOKING ----------
+    async function confirmBooking() {
+      const name = document.getElementById('customerName').value.trim();
+      const phone = document.getElementById('customerPhone').value.trim();
+      const email = document.getElementById('customerEmail').value.trim();
+      if (!name || !phone || !email) { showToast('Please fill in all personal details.'); return; }
+      if (!selectedServiceId || !selectedDate || !selectedTime) { showToast('Please complete service, date and time selection.'); return; }
+      const svc = services.find(s => s.id === selectedServiceId);
+      if (!svc) { showToast('Selected service not found.'); return; }
+      if (tokenBalance <= 0) { showToast('This provider has no tokens left. Please try again later.'); return; }
+
+      const newBooking = {
+        customerName: name, customerPhone: phone, customerEmail: email,
+        serviceId: svc.id, serviceName: svc.name,
+        date: selectedDate, time: selectedTime, status: 'pending',
+        price: svc.price, reminders: [...reminders],
+      };
+
+      let bookingId = 'b' + Date.now();
+      if (USE_SUPABASE) {
+        const { data, error } = await supabase.from('bookings').insert([{
+          customer_name: name, customer_phone: phone, customer_email: email,
+          service_id: svc.id, service_name: svc.name,
+          booking_date: selectedDate, booking_time: selectedTime,
+          status: 'pending', price: svc.price, reminders: reminders,
+        }]).select().single();
+        if (error) { showToast('Booking failed: ' + error.message); return; }
+        bookingId = data.id;
+        newBooking.id = data.id;
+      } else {
+        newBooking.id = bookingId;
+      }
+
+      const ok = await consumeToken();
+      if (!ok) return;
+
+      bookings.push(newBooking);
+      updateStats();
+
+      document.getElementById('step3Content').classList.add('hidden');
+      document.getElementById('confirmationContent').classList.remove('hidden');
+      document.getElementById('step3Indicator').classList.remove('active');
+      document.getElementById('confirmationMessage').textContent =
+        `${name}, your ${svc.name} on ${formatDate(selectedDate)} at ${formatTime(selectedTime)} is booked. Provider token balance: ${tokenBalance}.`;
+      document.getElementById('shareableLink').textContent = `https://velveteen.studio/booking/${bookingId}`;
+
+      selectedServiceId = null; selectedDate = null; selectedTime = null;
+      reminders = [{ lead: '30min', method: 'SMS' }];
+      document.getElementById('customerName').value = '';
+      document.getElementById('customerPhone').value = '';
+      document.getElementById('customerEmail').value = '';
+      document.getElementById('toStep2Btn').disabled = true;
+      document.getElementById('toStep3Btn').disabled = true;
+      document.getElementById('confirmBookingBtn').disabled = true;
+      renderReminders();
+      updateStats();
+    }
+
+    // ---------- STATS ----------
+    function updateStats() {
+      const today = todayStr();
+      document.getElementById('statToday').textContent = bookings.filter(b => b.date === today && b.status !== 'cancelled').length;
+      document.getElementById('statUpcoming').textContent = bookings.filter(b => b.date >= today && b.status !== 'cancelled' && b.status !== 'completed').length;
+      document.getElementById('statRevenue').textContent = formatCurrency(bookings.filter(b => b.status !== 'cancelled').reduce((s,b) => s + Number(b.price), 0));
+      document.getElementById('statServices').textContent = services.filter(s => s.active).length;
+    }
+
+    // ---------- BOOKINGS TABLE ----------
+    function renderBookingsTable() {
+      const search = document.getElementById('bookingSearch').value.toLowerCase();
+      const statusFilter = document.getElementById('bookingStatusFilter').value;
+      const tbody = document.getElementById('bookingsTableBody');
+      tbody.innerHTML = '';
+      const filtered = bookings.filter(b => {
+        const ms = b.customerName.toLowerCase().includes(search) || b.serviceName.toLowerCase().includes(search);
+        const mt = statusFilter === 'all' || b.status === statusFilter;
+        return ms && mt;
+      });
+      filtered.sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
+      filtered.forEach(b => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${b.customerName}</td>
+          <td>${b.serviceName}</td>
+          <td>${formatDate(b.date)} · ${formatTime(b.time)}</td>
+          <td><span class="status-badge status-${b.status}">${b.status}</span></td>
+          <td>
+            <button class="btn btn-sm btn-outline action-btn" data-id="${b.id}" data-action="confirmed">Confirm</button>
+            <button class="btn btn-sm btn-outline action-btn" data-id="${b.id}" data-action="completed">Complete</button>
+            <button class="btn btn-sm btn-outline action-btn" data-id="${b.id}" data-action="cancelled">Cancel</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      tbody.querySelectorAll('.action-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.target.dataset.id;
+          const action = e.target.dataset.action;
+          const booking = bookings.find(b => b.id === id);
+          if (!booking) return;
+          if (booking.status === 'cancelled') { showToast('Cannot change a cancelled booking.'); return; }
+          if (USE_SUPABASE) {
+            const { error } = await supabase.from('bookings').update({ status: action }).eq('id', id);
+            if (error) { showToast('Update failed: ' + error.message); return; }
+          }
+          booking.status = action;
+          renderBookingsTable(); updateStats();
+          showToast(`Booking ${action}.`);
+        });
+      });
+      if (filtered.length === 0) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#9b8a7c;">No bookings found.</td></tr>';
+    }
+
+    // ---------- SERVICES LIST ----------
+    function renderServicesList() {
+      const container = document.getElementById('servicesList');
+      if (services.length === 0) { container.innerHTML = '<p style="padding:1rem;color:#9b8a7c;">No services yet.</p>'; return; }
+      container.innerHTML = '';
+      services.forEach(s => {
+        const div = document.createElement('div');
+        div.className = 'service-item';
+        div.innerHTML = `
+          <div>
+            <strong>${s.name}</strong> <span style="font-size:0.8rem;color:#7a6a5e;">(${s.category})</span>
+            <div style="font-size:0.8rem;color:#7a6a5e;">${formatCurrency(s.price)} · ${s.duration} min · ${s.active ? 'Active' : 'Hidden'}</div>
+          </div>
+          <div style="display:flex; gap:0.5rem;">
+            <button class="btn btn-sm btn-outline toggle-active" data-id="${s.id}">${s.active ? 'Hide' : 'Activate'}</button>
+            <button class="btn btn-sm btn-danger delete-service" data-id="${s.id}">Delete</button>
+          </div>`;
+        container.appendChild(div);
+      });
+      container.querySelectorAll('.toggle-active').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const s = services.find(x => x.id === e.target.dataset.id);
+          if (!s) return;
+          const newActive = !s.active;
+          if (USE_SUPABASE) {
+            const { error } = await supabase.from('services').update({ active: newActive }).eq('id', s.id);
+            if (error) { showToast('Update failed: ' + error.message); return; }
+          }
+          s.active = newActive;
+          renderServicesList(); renderServices(); updateStats();
+        });
+      });
+      container.querySelectorAll('.delete-service').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.target.dataset.id;
+          if (USE_SUPABASE) {
+            const { error } = await supabase.from('services').delete().eq('id', id);
+            if (error) { showToast('Delete failed: ' + error.message); return; }
+          }
+          services = services.filter(x => x.id !== id);
+          renderServicesList(); renderServices(); updateStats();
+        });
+      });
+    }
+
+    // ---------- AVAILABILITY ----------
+    function renderSlotGrid() {
+      const date = document.getElementById('availabilityDate').value;
+      const container = document.getElementById('slotGridContainer');
+      if (!date) { container.innerHTML = '<p style="color:#9b8a7c;">Select a date.</p>'; return; }
+      const slots = generateTimeSlots();
+      const blocked = blockedSlots[date] || [];
+      container.innerHTML = '';
+      slots.forEach(t => {
+        const el = document.createElement('div');
+        el.className = 'slot-block' + (blocked.includes(t) ? ' blocked' : '');
+        el.textContent = t;
+        el.addEventListener('click', () => {
+          if (!blockedSlots[date]) blockedSlots[date] = [];
+          const arr = blockedSlots[date];
+          const idx = arr.indexOf(t);
+          if (idx >= 0) arr.splice(idx, 1); else arr.push(t);
+          renderSlotGrid();
+        });
+        container.appendChild(el);
+      });
+    }
+
+    // ---------- ADMIN TABS ----------
+    function switchAdminTab(tab) {
+      adminActiveTab = tab;
+      document.querySelectorAll('.admin-tabs button').forEach(b => b.classList.remove('active'));
+      const tabBtn = document.querySelector(`.admin-tabs button[data-tab="${tab}"]`);
+      if (tabBtn) tabBtn.classList.add('active');
+      document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+      const map = { bookings:'adminBookingsPanel', services:'adminServicesPanel', availability:'adminAvailabilityPanel', settings:'adminSettingsPanel' };
+      document.getElementById(map[tab]).classList.add('active');
+      if (tab === 'bookings') renderBookingsTable();
+      if (tab === 'services') renderServicesList();
+      if (tab === 'availability') { document.getElementById('availabilityDate').value = todayStr(); renderSlotGrid(); }
+      if (tab === 'settings') loadSettingsForm();
+    }
+
+    // ---------- SETTINGS ----------
+    function loadSettingsForm() {
+      document.getElementById('settingsName').value = settings.businessName;
+      document.getElementById('settingsTagline').value = settings.tagline;
+      document.getElementById('settingsPhone').value = settings.phone;
+      document.getElementById('settingsEmail').value = settings.email;
+      document.getElementById('settingsWorkingDays').value = settings.workingDays;
+      document.getElementById('settingsHours').value = settings.hours;
+      document.getElementById('settingsSlotInterval').value = settings.slotInterval;
+      document.getElementById('settingsCancelWindow').value = settings.cancelWindow;
+      document.getElementById('settingsCurrency').value = settings.currency;
+      document.getElementById('cancelWindowDisplay').textContent = settings.cancelWindow;
+    }
+
+    async function saveSettings() {
+      settings.businessName = document.getElementById('settingsName').value;
+      settings.tagline = document.getElementById('settingsTagline').value;
+      settings.phone = document.getElementById('settingsPhone').value;
+      settings.email = document.getElementById('settingsEmail').value;
+      settings.workingDays = document.getElementById('settingsWorkingDays').value;
+      settings.hours = document.getElementById('settingsHours').value;
+      settings.slotInterval = parseInt(document.getElementById('settingsSlotInterval').value) || 30;
+      settings.cancelWindow = parseInt(document.getElementById('settingsCancelWindow').value) || 24;
+      settings.currency = document.getElementById('settingsCurrency').value;
+      document.getElementById('brandName').textContent = settings.businessName;
+      document.getElementById('brandTagline').textContent = settings.tagline;
+      document.getElementById('cancelWindowDisplay').textContent = settings.cancelWindow;
+      if (USE_SUPABASE) {
+        const { error } = await supabase.from('provider_settings').update({
+          business_name: settings.businessName, currency: settings.currency,
+        }).eq('id', 1);
+        if (error) showToast('Settings saved locally (Supabase: ' + error.message + ')');
+        else showToast('Settings saved to Supabase.');
+      } else showToast('Settings saved locally.');
+      renderServices(); renderServicesList(); updateStats();
+      if (adminActiveTab === 'availability') renderSlotGrid();
+    }
+
+    // ---------- VIEW SWITCH ----------
+    function setView(view) {
+      document.getElementById('customerView').classList.toggle('active', view === 'customer');
+      document.getElementById('adminView').classList.toggle('active', view === 'admin');
+      document.getElementById('customerViewBtn').classList.toggle('active', view === 'customer');
+      document.getElementById('adminViewBtn').classList.toggle('active', view === 'admin');
+      if (view === 'admin') {
+        document.getElementById('loginView').classList.toggle('hidden', isLoggedIn);
+        document.getElementById('adminContent').classList.toggle('hidden', !isLoggedIn);
+        if (isLoggedIn) { updateTokenUI(); updateStats(); renderBookingsTable(); }
+      }
+    }
+
+    // ---------- AUTH (demo) ----------
+    async function handleLogin() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      if (!email || !password) { showToast('Enter email and password.'); return; }
+      if (USE_SUPABASE) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) { showToast('Login failed: ' + error.message); return; }
+      }
+      isLoggedIn = true;
+      setView('admin');
+      document.getElementById('loginView').classList.add('hidden');
+      document.getElementById('adminContent').classList.remove('hidden');
+      await loadDataFromSupabase();
+      updateTokenUI(); updateStats(); renderBookingsTable(); renderServicesList();
+      showToast('Welcome back!');
+    }
+
+    async function handleSignup() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      if (!email || !password) { showToast('Enter email and password.'); return; }
+      if (USE_SUPABASE) {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) { showToast('Signup failed: ' + error.message); return; }
+        showToast('Account created! Check your email if confirmation is enabled.');
+      } else {
+        showToast('Demo account created. Sign in with any credentials.');
+      }
+      isLoggedIn = true;
+      setView('admin');
+      document.getElementById('loginView').classList.add('hidden');
+      document.getElementById('adminContent').classList.remove('hidden');
+      await loadDataFromSupabase();
+      updateTokenUI(); updateStats(); renderBookingsTable(); renderServicesList();
+    }
+
+    // ---------- NAVIGATION ----------
+    function goToStep(step) {
+      currentStep = step;
+      document.getElementById('step1Content').classList.toggle('hidden', step !== 1);
+      document.getElementById('step2Content').classList.toggle('hidden', step !== 2);
+      document.getElementById('step3Content').classList.toggle('hidden', step !== 3);
+      document.getElementById('confirmationContent').classList.toggle('hidden', step !== 4);
+      document.getElementById('step1Indicator').classList.toggle('active', step >= 1);
+      document.getElementById('step2Indicator').classList.toggle('active', step >= 2);
+      document.getElementById('step3Indicator').classList.toggle('active', step >= 3);
+      if (step === 2) renderCalendar();
+      if (step === 3) renderReminders();
+    }
+
+    // ---------- INIT ----------
+    async function init() {
+      renderServices(); renderReminders();
+      document.getElementById('cancelWindowDisplay').textContent = settings.cancelWindow;
+      if (USE_SUPABASE) await loadDataFromSupabase();
+      updateTokenUI(); updateStats(); renderBookingsTable(); renderServicesList();
+
+      document.getElementById('customerViewBtn').addEventListener('click', () => setView('customer'));
+      document.getElementById('adminViewBtn').addEventListener('click', () => setView('admin'));
+      document.getElementById('loginBtn').addEventListener('click', handleLogin);
+      document.getElementById('signupBtn').addEventListener('click', handleSignup);
+
+      document.getElementById('toStep2Btn').addEventListener('click', () => goToStep(2));
+      document.getElementById('backToStep1Btn').addEventListener('click', () => goToStep(1));
+      document.getElementById('toStep3Btn').addEventListener('click', () => goToStep(3));
+      document.getElementById('backToStep2Btn').addEventListener('click', () => goToStep(2));
+      document.getElementById('confirmBookingBtn').addEventListener('click', confirmBooking);
+      document.getElementById('newBookingBtn').addEventListener('click', () => { goToStep(1); renderServices(); document.getElementById('toStep2Btn').disabled = true; });
+
+      document.getElementById('addReminderBtn').addEventListener('click', () => {
+        if (reminders.length < 3) { reminders.push({ lead: '1h', method: 'Email' }); renderReminders(); }
+      });
+
+      document.getElementById('prevMonth').addEventListener('click', () => { currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1); renderCalendar(); });
+      document.getElementById('nextMonth').addEventListener('click', () => { currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1); renderCalendar(); });
+
+      document.getElementById('copyLinkBtn').addEventListener('click', () => {
+        navigator.clipboard.writeText(document.getElementById('shareableLink').textContent);
+        showToast('Link copied!');
+      });
+
+      document.querySelectorAll('.admin-tabs button').forEach(b => b.addEventListener('click', () => switchAdminTab(b.dataset.tab)));
+      document.getElementById('bookingSearch').addEventListener('input', renderBookingsTable);
+      document.getElementById('bookingStatusFilter').addEventListener('change', renderBookingsTable);
+
+      document.getElementById('addServiceBtn').addEventListener('click', async () => {
+        const name = document.getElementById('newServiceName').value.trim();
+        const category = document.getElementById('newServiceCategory').value.trim();
+        const price = parseFloat(document.getElementById('newServicePrice').value);
+        const duration = parseInt(document.getElementById('newServiceDuration').value);
+        const desc = document.getElementById('newServiceDesc').value.trim();
+        if (!name || !category || isNaN(price) || isNaN(duration)) { showToast('Please fill all service fields.'); return; }
+        const newService = { id: 's' + Date.now(), name, category, description: desc, price, duration, active: true };
+        if (USE_SUPABASE) {
+          const { data, error } = await supabase.from('services').insert([{ name, category, description: desc, price, duration, active: true }]).select().single();
+          if (error) { showToast('Add failed: ' + error.message); return; }
+          newService.id = data.id;
+        }
+        services.push(newService);
+        document.getElementById('newServiceName').value = '';
+        document.getElementById('newServiceCategory').value = '';
+        document.getElementById('newServicePrice').value = '';
+        document.getElementById('newServiceDuration').value = '';
+        document.getElementById('newServiceDesc').value = '';
+        renderServicesList(); renderServices(); updateStats();
+        showToast('Service added.');
+      });
+
+      document.getElementById('availabilityDate').addEventListener('change', renderSlotGrid);
+      document.getElementById('blockRangeBtn').addEventListener('click', () => {
+        const date = document.getElementById('availabilityDate').value;
+        const from = document.getElementById('blockFrom').value;
+        const to = document.getElementById('blockTo').value;
+        if (!date || !from || !to) { showToast('Please select date and range.'); return; }
+        const slots = generateTimeSlots();
+        const startIdx = slots.indexOf(from);
+        const endIdx = slots.indexOf(to);
+        if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) { showToast('Invalid time range.'); return; }
+        if (!blockedSlots[date]) blockedSlots[date] = [];
+        for (let i = startIdx; i < endIdx; i++) if (!blockedSlots[date].includes(slots[i])) blockedSlots[date].push(slots[i]);
+        renderSlotGrid(); showToast('Range blocked.');
+      });
+
+      document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+      document.querySelectorAll('[data-topup]').forEach(btn => btn.addEventListener('click', () => topUpTokens(parseInt(btn.dataset.topup))));
+      document.getElementById('copyReferralBtn').addEventListener('click', () => { navigator.clipboard.writeText(document.getElementById('referralCode').textContent); showToast('Referral code copied!'); });
+      document.getElementById('simulateReferralBtn').addEventListener('click', applyReferralBonus);
+
+      setView('customer');
+      goToStep(1);
+      loadSettingsForm();
+      renderCalendar();
+      updateTokenUI();
+
+      if (!USE_SUPABASE) {
+        console.warn('⚠️ Running in DEMO mode (in-memory). Add Supabase credentials to persist data.');
+      } else {
+        console.log('✅ Connected to Supabase.');
+      }
+    }
+
+    init();
+  })();
+</script>
+</body>
+</html>
